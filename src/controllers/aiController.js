@@ -37,7 +37,7 @@ const localReply = async (message) => {
             COALESCE(SUM(total_profit), 0) AS keuntungan,
             COUNT(*) AS transaksi
      FROM transactions
-     WHERE created_at >= ? AND created_at < ?`,
+     WHERE created_at >= ? AND created_at < ? AND status = 'active'`,
     [range.start, range.end]
   );
   const stat = rows[0];
@@ -57,7 +57,7 @@ const localReply = async (message) => {
       `SELECT ti.product_name_snapshot AS name, SUM(ti.quantity) AS qty
        FROM transaction_items ti
        JOIN transactions t ON t.id = ti.transaction_id
-       WHERE t.created_at >= ? AND t.created_at < ?
+       WHERE t.created_at >= ? AND t.created_at < ? AND t.status = 'active'
        GROUP BY ti.product_id, ti.product_name_snapshot
        ORDER BY qty DESC
        LIMIT 3`,

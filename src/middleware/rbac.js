@@ -10,7 +10,7 @@ const requireRole = (...roles) => (req, res, next) => {
   }
 
   if (!roles.includes(req.user.role)) {
-    return fail(res, 403, 'Akses ditolak. Anda tidak memiliki hak untuk fitur ini.');
+    return fail(res, 403, 'Hanya Pemilik Usaha yang dapat mengakses fitur ini.');
   }
 
   return next();

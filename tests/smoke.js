@@ -43,6 +43,7 @@ let tokenP;
 let tokenK;
 let tempProductId;
 let tempTransactionCode;
+let tempVoidTransactionCode;
 let chatBaselineId = 0;
 
 (async () => {
@@ -165,6 +166,125 @@ let chatBaselineId = 0;
       }), 422);
     });
 
+    await step('Retur item parsial mengembalikan stok dan recalc total', async () => {
+      const [[before]] = await db.execute('SELECT stock FROM products WHERE id = ?', [tempProductId]);
+      const stockBefore = Number(before.stock);
+
+      const ret = await request('DELETE', `/transactions/${tempTransactionCode}/items/${tempProductId}`, {
+        token: tokenP,
+        body: { quantity: 1, reason: 'Smoke test retur parsial' },
+      });
+      expectStatus(ret, 200);
+      assert.equal(ret.data.data.transactionId, tempTransactionCode);
+      assert.equal(ret.data.data.itemId, String(tempProductId));
+      assert.equal(ret.data.data.returnedQty, 1);
+      assert.equal(ret.data.data.voided, false);
+      assert.equal(ret.data.data.transaction.totalPenjualan, 2200);
+      assert.equal(ret.data.data.transaction.keuntungan, 1000);
+      assert.equal(ret.data.message, 'Item berhasil diretur.');
+
+      const [[after]] = await db.execute('SELECT stock FROM products WHERE id = ?', [tempProductId]);
+      assert.equal(Number(after.stock), stockBefore + 1);
+
+      const detail = await request('GET', `/transactions/${tempTransactionCode}`, { token: tokenP });
+      expectStatus(detail, 200);
+      assert.equal(detail.data.data.totalPenjualan, 2200);
+      assert.equal(detail.data.data.items[0].qty, 1);
+    });
+
+    await step('Retur item terakhir mem-void transaksi (soft delete)', async () => {
+      const [[before]] = await db.execute('SELECT stock FROM products WHERE id = ?', [tempProductId]);
+      const stockBefore = Number(before.stock);
+
+      const ret = await request('DELETE', `/transactions/${tempTransactionCode}/items/${tempProductId}`, {
+        token: tokenP,
+        body: { reason: 'Smoke test retur terakhir' },
+      });
+      expectStatus(ret, 200);
+      assert.equal(ret.data.data.voided, true);
+      assert.equal(ret.data.data.transaction, null);
+      assert.equal(ret.data.message, 'Item terakhir diretur, transaksi dihapus.');
+
+      const [[after]] = await db.execute('SELECT stock FROM products WHERE id = ?', [tempProductId]);
+      assert.equal(Number(after.stock), stockBefore + 1);
+
+      expectStatus(await request('GET', `/transactions/${tempTransactionCode}`, { token: tokenP }), 404);
+    });
+
+    await step('Hapus/void seluruh transaksi (Pemilik)', async () => {
+      const created = await request('POST', '/transactions', {
+        token: tokenK,
+        body: { items: [{ productId: tempProductId, qty: 1 }] },
+      });
+      expectStatus(created, 201);
+      tempVoidTransactionCode = created.data.data.id;
+
+      const [[before]] = await db.execute('SELECT stock FROM products WHERE id = ?', [tempProductId]);
+      const stockBefore = Number(before.stock);
+
+      const del = await request('DELETE', `/transactions/${tempVoidTransactionCode}`, {
+        token: tokenP,
+        body: { reason: 'Smoke test void transaksi' },
+      });
+      expectStatus(del, 200);
+      assert.equal(del.data.data.transactionId, tempVoidTransactionCode);
+      assert.equal(del.data.data.voided, true);
+      assert.equal(del.data.message, 'Transaksi berhasil dihapus.');
+
+      const [[after]] = await db.execute('SELECT stock FROM products WHERE id = ?', [tempProductId]);
+      assert.equal(Number(after.stock), stockBefore + 1);
+      expectStatus(await request('GET', `/transactions/${tempVoidTransactionCode}`, { token: tokenP }), 404);
+    });
+
+    await step('Retur/hapus transaksi ditolak untuk Karyawan → 403', async () => {
+      expectStatus(
+        await request('DELETE', `/transactions/${tempVoidTransactionCode}`, { token: tokenK }),
+        403
+      );
+      expectStatus(
+        await request('DELETE', `/transactions/${tempVoidTransactionCode}/items/${tempProductId}`, { token: tokenK }),
+        403
+      );
+    });
+
+    await step('Retur/hapus transaksi tidak ditemukan → 404', async () => {
+      expectStatus(await request('DELETE', '/transactions/TRX-TIDAK-ADA', { token: tokenP }), 404);
+      expectStatus(
+        await request('DELETE', `/transactions/${tempVoidTransactionCode}/items/999999`, { token: tokenP }),
+        404
+      );
+    });
+
+    await step('Validasi retur transaksi → 422', async () => {
+      const created = await request('POST', '/transactions', {
+        token: tokenK,
+        body: { items: [{ productId: tempProductId, qty: 1 }] },
+      });
+      expectStatus(created, 201);
+      const trx = created.data.data.id;
+
+      expectStatus(
+        await request('DELETE', `/transactions/${trx}/items/${tempProductId}`, {
+          token: tokenP,
+          body: { quantity: 99 },
+        }),
+        422
+      );
+      expectStatus(
+        await request('DELETE', `/transactions/${trx}`, {
+          token: tokenP,
+          body: { reason: 'x'.repeat(201) },
+        }),
+        422
+      );
+
+      // cleanup tx ini lewat void valid lalu hapus row uji
+      expectStatus(await request('DELETE', `/transactions/${trx}`, { token: tokenP, body: { reason: 'cleanup' } }), 200);
+      await db.execute('DELETE FROM transaction_audits WHERE transaction_id = (SELECT id FROM transactions WHERE transaction_code = ?)', [trx]);
+      await db.execute('DELETE FROM transaction_items WHERE transaction_id = (SELECT id FROM transactions WHERE transaction_code = ?)', [trx]);
+      await db.execute('DELETE FROM transactions WHERE transaction_code = ?', [trx]);
+    });
+
     // --- DASHBOARD & ANALYTICS ---
     const month = new Date().toISOString().slice(0, 7);
     await step('GET /dashboard summary, trend, report', async () => {
@@ -248,13 +368,20 @@ let chatBaselineId = 0;
     });
   } finally {
     // --- CLEANUP ---
-    if (tempTransactionCode) {
+    for (const code of [tempTransactionCode, tempVoidTransactionCode]) {
+      if (!code) continue;
+      await db.execute(
+        'DELETE FROM transaction_audits WHERE transaction_id = (SELECT id FROM transactions WHERE transaction_code = ?)',
+        [code]
+      );
       await db.execute(
         'DELETE FROM transaction_items WHERE transaction_id = (SELECT id FROM transactions WHERE transaction_code = ?)',
-        [tempTransactionCode]
+        [code]
       );
-      await db.execute('DELETE FROM transactions WHERE transaction_code = ?', [tempTransactionCode]);
+      await db.execute('DELETE FROM transactions WHERE transaction_code = ?', [code]);
     }
+    // Bersihkan transaksi uji lain yang mungkin tertinggal (prefix TRX- dari smoke test create).
+    // Tidak dilakukan agresif; test di atas sudah cleanup eksplisit.
     if (tempProductId) {
       await db.execute('DELETE FROM products WHERE id = ?', [tempProductId]);
     }

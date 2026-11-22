@@ -23,6 +23,33 @@ const transactionSchema = Joi.object({
     }),
 });
 
+const reasonSchema = Joi.string().trim().max(200).allow('', null).messages({
+  'string.max': 'Alasan maksimal 200 karakter.',
+  'string.base': 'Alasan harus berupa teks.',
+});
+
+const voidTransactionSchema = Joi.object({
+  reason: reasonSchema,
+});
+
+const returnItemSchema = Joi.object({
+  quantity: Joi.number().integer().positive().messages({
+    'number.base': 'Jumlah retur harus bilangan bulat.',
+    'number.integer': 'Jumlah retur harus bilangan bulat.',
+    'number.positive': 'Jumlah retur harus minimal 1.',
+  }),
+  reason: reasonSchema,
+});
+
+const formatJoiError = (error, fallbackField = 'items') => {
+  const errors = {};
+  error.details.forEach((detail) => {
+    const field = detail.path.length ? detail.path.join('.') : fallbackField;
+    if (!errors[field]) errors[field] = detail.message;
+  });
+  return errors;
+};
+
 // Validasi payload transaksi. Frontend hanya mengirim productId + qty.
 // Harga modal/jual diambil dari server.
 
@@ -33,14 +60,27 @@ const validateTransaction = (payload) => {
   });
 
   if (!error) return { value };
-
-  const errors = {};
-  error.details.forEach((detail) => {
-    const field = detail.path.length ? detail.path.join('.') : 'items';
-    if (!errors[field]) errors[field] = detail.message;
-  });
-
-  return { error: errors };
+  return { error: formatJoiError(error) };
 };
 
-module.exports = { validateTransaction };
+const validateVoidTransaction = (payload) => {
+  const { error, value } = voidTransactionSchema.validate(payload || {}, {
+    abortEarly: false,
+    stripUnknown: true,
+  });
+
+  if (!error) return { value };
+  return { error: formatJoiError(error, 'reason') };
+};
+
+const validateReturnItem = (payload) => {
+  const { error, value } = returnItemSchema.validate(payload || {}, {
+    abortEarly: false,
+    stripUnknown: true,
+  });
+
+  if (!error) return { value };
+  return { error: formatJoiError(error, 'quantity') };
+};
+
+module.exports = { validateTransaction, validateVoidTransaction, validateReturnItem };

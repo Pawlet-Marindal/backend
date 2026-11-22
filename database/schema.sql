@@ -53,6 +53,10 @@ CREATE TABLE IF NOT EXISTS transactions (
 
     payment_method VARCHAR(50) NULL,
     notes TEXT NULL,
+    status ENUM('active', 'voided') NOT NULL DEFAULT 'active',
+    voided_at DATETIME NULL,
+    voided_by BIGINT UNSIGNED NULL,
+    void_reason VARCHAR(200) NULL,
 
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
@@ -61,9 +65,15 @@ CREATE TABLE IF NOT EXISTS transactions (
         REFERENCES users(id)
         ON DELETE RESTRICT
         ON UPDATE CASCADE,
+    CONSTRAINT fk_transactions_voided_by
+        FOREIGN KEY (voided_by)
+        REFERENCES users(id)
+        ON DELETE SET NULL
+        ON UPDATE CASCADE,
 
     INDEX idx_transactions_date (created_at),
-    INDEX idx_transactions_employee (employee_id)
+    INDEX idx_transactions_employee (employee_id),
+    INDEX idx_transactions_status_date (status, created_at)
 ) ENGINE=InnoDB;
 
 -- TRANSACTION ITEMS
@@ -95,6 +105,31 @@ CREATE TABLE IF NOT EXISTS transaction_items (
 
     INDEX idx_items_transaction (transaction_id),
     INDEX idx_items_product (product_id)
+) ENGINE=InnoDB;
+
+-- TRANSACTION AUDITS
+CREATE TABLE IF NOT EXISTS transaction_audits (
+    id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    transaction_id BIGINT UNSIGNED NOT NULL,
+    action ENUM('VOID_TRANSACTION', 'RETURN_ITEM') NOT NULL,
+    actor_user_id BIGINT UNSIGNED NULL,
+    reason VARCHAR(200) NULL,
+    details JSON NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT fk_tx_audits_transaction
+        FOREIGN KEY (transaction_id)
+        REFERENCES transactions(id)
+        ON DELETE CASCADE
+        ON UPDATE CASCADE,
+    CONSTRAINT fk_tx_audits_actor
+        FOREIGN KEY (actor_user_id)
+        REFERENCES users(id)
+        ON DELETE SET NULL
+        ON UPDATE CASCADE,
+
+    INDEX idx_tx_audits_tx_created (transaction_id, created_at),
+    INDEX idx_tx_audits_actor_created (actor_user_id, created_at)
 ) ENGINE=InnoDB;
 
 -- SETTINGS

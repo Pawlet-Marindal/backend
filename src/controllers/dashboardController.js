@@ -10,7 +10,7 @@ const aggregate = async (range) => {
             COALESCE(SUM(total_profit), 0) AS keuntungan,
             COUNT(*) AS transaksi
      FROM transactions
-     WHERE created_at >= ? AND created_at < ?`,
+     WHERE created_at >= ? AND created_at < ? AND status = 'active'`,
     [range.start, range.end]
   );
   const row = rows[0];
@@ -58,7 +58,7 @@ const trend = async (req, res) => {
               SUM(total_sales) AS penjualan,
               SUM(total_profit) AS keuntungan
        FROM transactions
-       WHERE created_at >= ? AND created_at < ?
+       WHERE created_at >= ? AND created_at < ? AND status = 'active'
        GROUP BY DAY(created_at)`,
       [currentMonth.start, currentMonth.end]
     );
@@ -100,7 +100,7 @@ const report = async (req, res) => {
               COALESCE(SUM(total_sales), 0) AS penjualan,
               COALESCE(SUM(total_profit), 0) AS keuntungan
        FROM transactions
-       WHERE created_at >= ? AND created_at < ?
+       WHERE created_at >= ? AND created_at < ? AND status = 'active'
        GROUP BY DAY(created_at)
        ORDER BY tanggal ASC`,
       [currentMonth.start, currentMonth.end]
@@ -126,7 +126,7 @@ const report = async (req, res) => {
               SUM(ti.subtotal_profit) AS keuntungan
        FROM transaction_items ti
        JOIN transactions t ON t.id = ti.transaction_id
-       WHERE t.created_at >= ? AND t.created_at < ?
+       WHERE t.created_at >= ? AND t.created_at < ? AND t.status = 'active'
        GROUP BY ti.product_id, ti.product_name_snapshot
        ORDER BY qty DESC, penjualan DESC
        LIMIT 10`,

@@ -169,8 +169,10 @@ Query yang didukung: `page`, `limit` (atau `all`), `search`, `category` / `kateg
 | POST | `/transactions` | Ya | Semua |
 | GET | `/transactions` | Ya | Semua |
 | GET | `/transactions/:id` | Ya | Semua |
+| DELETE | `/transactions/:id` | Ya | Pemilik |
+| DELETE | `/transactions/:id/items/:itemId` | Ya | Pemilik |
 
-Filter: `month` (`YYYY-MM`), `employeeId`, `search`, `page`, `limit`.
+Filter: `month` (`YYYY-MM`), `employeeId`, `search`, `page`, `limit`. Body retur opsional: `{ "reason": "...", "quantity": 1 }` (`quantity` hanya untuk retur item; kosong = retur seluruh qty item).
 
 ### Dashboard & Laporan
 | Method | Endpoint | Token | Role |
@@ -203,10 +205,11 @@ Filter: `month` (`YYYY-MM`), `employeeId`, `search`, `page`, `limit`.
 
 1. **Snapshot harga transaksi** — front-end hanya mengirim `productId` dan `qty`. Server mengambil `hargaModal` dan `hargaJual` dari database lalu menyimpannya sebagai snapshot. Riwayat keuntungan tidak berubah kalau harga produk diedit kemudian.
 2. **Stok otomatis berkurang** saat transaksi berhasil. Transaksi memakai database transaction agar stok dan struk konsisten.
-3. **Bulan kosong mengembalikan angka `0`**, bukan `null`.
-4. **Tren harian** memakai `null` untuk tanggal tanpa transaksi.
-5. **Validasi Joi** dipakai pada semua input; error dikembalikan sebagai objek `errors` per field.
-6. **Front-End tidak pernah memanggil provider AI langsung** — semua lewat `/api/v1/ai/chat`. Jika `AI_SERVICE_URL` diisi dan layanan gagal/timeout, server balas `503`.
+3. **Retur/void transaksi bersifat soft-delete** — transaksi tidak di-hard-delete; status diubah `voided`, stok dikembalikan, total dihitung ulang dari snapshot item, dan jejak audit dicatat di `transaction_audits`. Transaksi voided disembunyikan dari list/detail/dashboard/laporan/analytics/AI.
+4. **Bulan kosong mengembalikan angka `0`**, bukan `null`.
+5. **Tren harian** memakai `null` untuk tanggal tanpa transaksi.
+6. **Validasi Joi** dipakai pada semua input; error dikembalikan sebagai objek `errors` per field.
+7. **Front-End tidak pernah memanggil provider AI langsung** — semua lewat `/api/v1/ai/chat`. Jika `AI_SERVICE_URL` diisi dan layanan gagal/timeout, server balas `503`.
 
 ---
 

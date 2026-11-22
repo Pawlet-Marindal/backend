@@ -21,7 +21,7 @@ const insights = async (req, res) => {
               SUM(ti.subtotal_sales) AS penjualan
        FROM transaction_items ti
        JOIN transactions t ON t.id = ti.transaction_id
-       WHERE t.created_at >= ? AND t.created_at < ?
+       WHERE t.created_at >= ? AND t.created_at < ? AND t.status = 'active'
        GROUP BY ti.product_id, ti.product_name_snapshot
        ORDER BY qty DESC, penjualan DESC
        LIMIT 1`,
@@ -32,7 +32,7 @@ const insights = async (req, res) => {
     const [dayRows] = await db.execute(
       `SELECT DAYOFWEEK(created_at) AS day_index, COUNT(*) AS transaksi
        FROM transactions
-       WHERE created_at >= ? AND created_at < ?
+       WHERE created_at >= ? AND created_at < ? AND status = 'active'
        GROUP BY DAYOFWEEK(created_at)
        ORDER BY transaksi DESC, day_index ASC
        LIMIT 1`,

@@ -1,6 +1,10 @@
 const db = require('../config/database');
 const { success, fail } = require('../utils/response');
-const { validateTransaction } = require('../validators/transactionValidator');
+const {
+  validateTransaction,
+  validateVoidTransaction,
+  validateReturnItem,
+} = require('../validators/transactionValidator');
 
 const mapItem = (row) => ({
   productId: String(row.product_id),
@@ -50,6 +54,33 @@ const nextTransactionCode = async (connection) => {
     "SELECT MAX(CAST(SUBSTRING(transaction_code, 5) AS UNSIGNED)) AS max_seq FROM transactions WHERE transaction_code LIKE 'TRX-%'"
   );
   return `TRX-${String(Number(rows[0]?.max_seq || 0) + 1).padStart(4, '0')}`;
+};
+
+const getActiveTransactionForUpdate = async (connection, idParam) => {
+  const [rows] = await connection.execute(
+    `SELECT t.id, t.transaction_code, t.employee_id, u.name AS employee_name,
+            t.total_cost, t.total_sales, t.total_profit, t.created_at, t.status
+     FROM transactions t
+     JOIN users u ON u.id = t.employee_id
+     WHERE (t.id = ? OR t.transaction_code = ?) AND t.status = 'active'
+     LIMIT 1
+     FOR UPDATE`,
+    [idParam, idParam]
+  );
+  return rows[0] || null;
+};
+
+const insertAudit = async (connection, { transactionId, action, actorUserId, reason, details }) => {
+  await connection.execute(
+    `INSERT INTO transaction_audits (transaction_id, action, actor_user_id, reason, details)
+     VALUES (?, ?, ?, ?, ?)`,
+    [transactionId, action, actorUserId, reason || null, JSON.stringify(details || {})]
+  );
+};
+
+const restoreProductStock = async (connection, productId, qty) => {
+  if (!productId) return;
+  await connection.execute('UPDATE products SET stock = stock + ? WHERE id = ?', [qty, productId]);
 };
 
 // Simpan transaksi kasir.
@@ -193,7 +224,7 @@ const list = async (req, res) => {
     const requestedLimit = all ? 0 : Math.max(1, parseInt(rawLimit, 10) || 10);
     const requestedPage = Math.max(1, parseInt(req.query.page, 10) || 1);
 
-    const where = ['1 = 1'];
+    const where = ["t.status = 'active'"];
     const params = [];
 
     if (/^\d{4}-\d{2}$/.test(month)) {
@@ -262,7 +293,7 @@ const getById = async (req, res) => {
               t.total_cost, t.total_sales, t.total_profit, t.created_at
        FROM transactions t
        JOIN users u ON u.id = t.employee_id
-       WHERE t.id = ? OR t.transaction_code = ?
+       WHERE (t.id = ? OR t.transaction_code = ?) AND t.status = 'active'
        LIMIT 1`,
       [req.params.id, req.params.id]
     );
@@ -279,4 +310,233 @@ const getById = async (req, res) => {
   }
 };
 
-module.exports = { create, list, getById };
+const remove = async (req, res) => {
+  const { error, value } = validateVoidTransaction(req.body);
+  if (error) {
+    return fail(res, 422, 'Data belum valid.', error);
+  }
+
+  const connection = await db.getConnection();
+  try {
+    await connection.beginTransaction();
+
+    const tx = await getActiveTransactionForUpdate(connection, req.params.id);
+    if (!tx) {
+      await connection.rollback();
+      return fail(res, 404, 'Transaksi tidak ditemukan.');
+    }
+
+    const [items] = await connection.execute(
+      `SELECT id, product_id, product_name_snapshot, cost_price_snapshot, selling_price_snapshot, quantity
+       FROM transaction_items
+       WHERE transaction_id = ?
+       FOR UPDATE`,
+      [tx.id]
+    );
+
+    for (const item of items) {
+      await restoreProductStock(connection, item.product_id, Number(item.quantity));
+    }
+
+    const reason = value.reason ? String(value.reason).trim() : null;
+    await connection.execute(
+      `UPDATE transactions
+       SET status = 'voided', voided_at = NOW(), voided_by = ?, void_reason = ?
+       WHERE id = ?`,
+      [req.user.id, reason, tx.id]
+    );
+
+    await insertAudit(connection, {
+      transactionId: tx.id,
+      action: 'VOID_TRANSACTION',
+      actorUserId: req.user.id,
+      reason,
+      details: {
+        transactionCode: tx.transaction_code,
+        totalModal: Number(tx.total_cost),
+        totalPenjualan: Number(tx.total_sales),
+        keuntungan: Number(tx.total_profit),
+        itemsCount: items.length,
+      },
+    });
+
+    await connection.commit();
+    return success(
+      res,
+      { transactionId: tx.transaction_code, voided: true },
+      200,
+      { message: 'Transaksi berhasil dihapus.' }
+    );
+  } catch (err) {
+    await connection.rollback();
+    console.error('[transactionController.remove]', err);
+    return fail(res, 500, 'Terjadi kesalahan pada server. Silakan coba lagi.');
+  } finally {
+    connection.release();
+  }
+};
+
+const returnItem = async (req, res) => {
+  const { error, value } = validateReturnItem(req.body);
+  if (error) {
+    return fail(res, 422, 'Data belum valid.', error);
+  }
+
+  const connection = await db.getConnection();
+  try {
+    await connection.beginTransaction();
+
+    const tx = await getActiveTransactionForUpdate(connection, req.params.id);
+    if (!tx) {
+      await connection.rollback();
+      return fail(res, 404, 'Transaksi tidak ditemukan.');
+    }
+
+    const [itemRows] = await connection.execute(
+      `SELECT id, product_id, product_name_snapshot, cost_price_snapshot, selling_price_snapshot,
+              quantity, subtotal_cost, subtotal_sales, subtotal_profit
+       FROM transaction_items
+       WHERE transaction_id = ? AND product_id = ?
+       LIMIT 1
+       FOR UPDATE`,
+      [tx.id, req.params.itemId]
+    );
+
+    const item = itemRows[0];
+    if (!item) {
+      await connection.rollback();
+      return fail(res, 404, 'Item pada transaksi tidak ditemukan.');
+    }
+
+    const currentQty = Number(item.quantity);
+    const hasQty = value.quantity !== undefined && value.quantity !== null && value.quantity !== '';
+    const returnQty = hasQty ? Number(value.quantity) : currentQty;
+    if (!Number.isInteger(returnQty) || returnQty <= 0 || returnQty > currentQty) {
+      await connection.rollback();
+      return fail(res, 422, `Jumlah retur harus bilangan bulat 1 sampai ${currentQty}.`, {
+        quantity: `Jumlah retur harus 1 sampai ${currentQty}.`,
+      });
+    }
+
+    await restoreProductStock(connection, item.product_id, returnQty);
+
+    const reason = value.reason ? String(value.reason).trim() : null;
+    const before = {
+      transaction: {
+        totalModal: Number(tx.total_cost),
+        totalPenjualan: Number(tx.total_sales),
+        keuntungan: Number(tx.total_profit),
+      },
+      item: {
+        productId: item.product_id ? String(item.product_id) : null,
+        name: item.product_name_snapshot,
+        qty: currentQty,
+      },
+    };
+
+    if (returnQty === currentQty) {
+      await connection.execute('DELETE FROM transaction_items WHERE id = ?', [item.id]);
+    } else {
+      const remainingQty = currentQty - returnQty;
+      const cost = Number(item.cost_price_snapshot);
+      const sell = Number(item.selling_price_snapshot);
+      await connection.execute(
+        `UPDATE transaction_items
+         SET quantity = ?, subtotal_cost = ?, subtotal_sales = ?, subtotal_profit = ?
+         WHERE id = ?`,
+        [remainingQty, cost * remainingQty, sell * remainingQty, (sell - cost) * remainingQty, item.id]
+      );
+    }
+
+    const [remainingRows] = await connection.execute(
+      `SELECT id, product_id, product_name_snapshot, cost_price_snapshot, selling_price_snapshot,
+              quantity, subtotal_cost, subtotal_sales, subtotal_profit
+       FROM transaction_items
+       WHERE transaction_id = ?
+       ORDER BY id ASC`,
+      [tx.id]
+    );
+
+    const voided = remainingRows.length === 0;
+    let responseTransaction = null;
+
+    if (voided) {
+      await connection.execute(
+        `UPDATE transactions
+         SET status = 'voided', voided_at = NOW(), voided_by = ?, void_reason = ?
+         WHERE id = ?`,
+        [req.user.id, reason, tx.id]
+      );
+    } else {
+      const totalModal = remainingRows.reduce((sum, row) => sum + Number(row.subtotal_cost), 0);
+      const totalPenjualan = remainingRows.reduce((sum, row) => sum + Number(row.subtotal_sales), 0);
+      const keuntungan = remainingRows.reduce((sum, row) => sum + Number(row.subtotal_profit), 0);
+
+      await connection.execute(
+        `UPDATE transactions
+         SET total_cost = ?, total_sales = ?, total_profit = ?
+         WHERE id = ?`,
+        [totalModal, totalPenjualan, keuntungan, tx.id]
+      );
+
+      responseTransaction = mapTransaction(
+        {
+          ...tx,
+          total_cost: totalModal,
+          total_sales: totalPenjualan,
+          total_profit: keuntungan,
+        },
+        remainingRows.map(mapItem)
+      );
+    }
+
+    await insertAudit(connection, {
+      transactionId: tx.id,
+      action: 'RETURN_ITEM',
+      actorUserId: req.user.id,
+      reason,
+      details: {
+        transactionCode: tx.transaction_code,
+        itemId: item.product_id ? String(item.product_id) : null,
+        returnedQty: returnQty,
+        voided,
+        before,
+        after: voided
+          ? { transaction: { totalModal: 0, totalPenjualan: 0, keuntungan: 0 } }
+          : {
+              transaction: {
+                totalModal: responseTransaction.totalModal,
+                totalPenjualan: responseTransaction.totalPenjualan,
+                keuntungan: responseTransaction.keuntungan,
+              },
+            },
+      },
+    });
+
+    await connection.commit();
+    return success(
+      res,
+      {
+        transactionId: tx.transaction_code,
+        itemId: item.product_id ? String(item.product_id) : String(req.params.itemId),
+        returnedQty: returnQty,
+        voided,
+        transaction: responseTransaction,
+      },
+      200,
+      {
+        message: voided
+          ? 'Item terakhir diretur, transaksi dihapus.'
+          : 'Item berhasil diretur.',
+      }
+    );
+  } catch (err) {
+    await connection.rollback();
+    console.error('[transactionController.returnItem]', err);
+    return fail(res, 500, 'Terjadi kesalahan pada server. Silakan coba lagi.');
+  } finally {
+    connection.release();
+  }
+};
+
+module.exports = { create, list, getById, remove, returnItem };

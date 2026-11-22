@@ -1,11 +1,19 @@
 // Helper envelope response standar API Pawlet.
 // Wajib pakai agar bentuk JSON konsisten dengan kontrak.
 
-const success = (res, data, statusCode = 200, meta) => {
+const success = (res, data, statusCode = 200, options) => {
+  const extra =
+    options && typeof options === 'object' && (Object.hasOwn(options, 'meta') || Object.hasOwn(options, 'message'))
+      ? options
+      : options
+        ? { meta: options }
+        : {};
+
   return res.status(statusCode).json({
     success: true,
     data,
-    ...(meta ? { meta } : {}),
+    ...(extra.meta ? { meta: extra.meta } : {}),
+    ...(extra.message ? { message: extra.message } : {}),
   });
 };
 

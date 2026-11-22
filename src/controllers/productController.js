@@ -102,7 +102,7 @@ const summary = async (req, res) => {
       `SELECT COALESCE(SUM(ti.quantity), 0) AS sold, COUNT(DISTINCT t.id) AS buyers
        FROM transaction_items ti
        JOIN transactions t ON t.id = ti.transaction_id
-       WHERE t.created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)`
+       WHERE t.created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY) AND t.status = 'active'`
     );
     const soldCurrent = Number(soldRows[0].sold);
     const buyersCurrent = Number(soldRows[0].buyers);
@@ -112,7 +112,8 @@ const summary = async (req, res) => {
        FROM transaction_items ti
        JOIN transactions t ON t.id = ti.transaction_id
        WHERE t.created_at >= DATE_SUB(NOW(), INTERVAL 14 DAY)
-         AND t.created_at < DATE_SUB(NOW(), INTERVAL 7 DAY)`
+         AND t.created_at < DATE_SUB(NOW(), INTERVAL 7 DAY)
+         AND t.status = 'active'`
     );
     const soldPrevious = Number(prevRows[0].sold);
     const buyersPrevious = Number(prevRows[0].buyers);
