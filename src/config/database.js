@@ -1,8 +1,7 @@
-
 const mysql = require("mysql2/promise");
 require("dotenv").config();
 
-const pool = mysql.createPool({
+const config = {
   host: process.env.DB_HOST,
   port: Number(process.env.DB_PORT || 3306),
   user: process.env.DB_USER,
@@ -15,7 +14,15 @@ const pool = mysql.createPool({
 
   enableKeepAlive: true,
   keepAliveInitialDelay: 0,
-});
+};
+
+// DB hosted biasanya mewajibkan TLS. Isi DB_SSL_CA bila provider memberi CA.
+if (String(process.env.DB_SSL || "").toLowerCase() === "true") {
+  config.ssl = process.env.DB_SSL_CA
+    ? { ca: process.env.DB_SSL_CA.replace(/\\n/g, "\n") }
+    : {};
+}
+
+const pool = mysql.createPool(config);
 
 module.exports = pool;
-

@@ -15,7 +15,17 @@ const errorHandler = (err, req, res, next) => {
     return next(err);
   }
 
-  console.error('[errorHandler]', err);
+  const rawStatus = Number(err.status || err.statusCode);
+  const status = rawStatus >= 400 && rawStatus <= 599 ? rawStatus : 500;
+
+  // Jangan log objek error mentah: bisa memuat body request (password/token).
+  console.error('[errorHandler]', {
+    method: req.method,
+    path: String(req.originalUrl || req.url || '').split('?')[0],
+    status,
+    code: err.code,
+    type: err.type,
+  });
 
   // Body JSON tidak valid, misalnya "{ "nama": "
   if (err instanceof SyntaxError && err.status === 400 && 'body' in err) {
@@ -30,8 +40,6 @@ const errorHandler = (err, req, res, next) => {
     return fail(res, 409, 'Data sudah ada. Periksa kembali data yang dikirim.');
   }
 
-  const rawStatus = Number(err.status || err.statusCode);
-  const status = rawStatus >= 400 && rawStatus <= 599 ? rawStatus : 500;
   const message = status === 500
     ? 'Terjadi kesalahan pada server. Silakan coba lagi.'
     : err.message || 'Permintaan tidak dapat diproses.';

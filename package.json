@@ -8,12 +8,16 @@
     "dev": "nodemon server.js",
     "seed": "node database/seed.js",
     "test": "node tests/smoke.js",
-    "test:smoke": "node tests/smoke.js"
+    "test:smoke": "node tests/smoke.js",
+    "test:netlify": "node tests/netlify-handler.js"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "type": "commonjs",
+  "engines": {
+    "node": ">=20 <25"
+  },
   "dependencies": {
     "bcryptjs": "^3.0.3",
     "cors": "^2.8.6",
@@ -21,7 +25,8 @@
     "express": "^5.3.0",
     "joi": "^18.3.2",
     "jsonwebtoken": "^9.0.3",
-    "mysql2": "^3.24.6"
+    "mysql2": "^3.24.6",
+    "serverless-http": "^4.0.0"
   },
   "devDependencies": {
     "nodemon": "^3.1.14"

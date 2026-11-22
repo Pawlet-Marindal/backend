@@ -1,0 +1,14 @@
+[build]
+  functions = "netlify/functions"
+  publish = "public"
+
+[build.environment]
+  NODE_VERSION = "22"
+
+# Semua request /api/v1/* dilempar ke Function "api".
+# Wrapper di netlify/functions/api.js normalisasi path ke route Express.
+[[redirects]]
+  from = "/api/v1/*"
+  to = "/.netlify/functions/api/:splat"
+  status = 200
+  force = true
