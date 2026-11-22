@@ -8,6 +8,9 @@ const transactionRoutes = require("./routes/transaction");
 const dashboardRoutes = require("./routes/dashboard");
 const analyticsRoutes = require("./routes/analytics");
 const aiRoutes = require("./routes/ai");
+const settingsRoutes = require("./routes/settings");
+const notificationRoutes = require("./routes/notification");
+const userAliasRoutes = require("./routes/userAlias");
 
 const app = express();
 
@@ -43,6 +46,9 @@ app.use("/api/v1/transactions", transactionRoutes);
 app.use("/api/v1/dashboard", dashboardRoutes);
 app.use("/api/v1/analytics", analyticsRoutes);
 app.use("/api/v1/ai", aiRoutes);
+app.use("/api/v1/settings", settingsRoutes);
+app.use("/api/v1/notifications", notificationRoutes);
+app.use("/api/v1/users", userAliasRoutes);
 
 // Route tidak ditemukan
 app.use((req, res) => {

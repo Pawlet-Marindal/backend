@@ -62,6 +62,24 @@ const seed = async () => {
   }
 
   console.log('Seed produk selesai.');
+
+  const notifications = [
+    ['info', 'Selamat datang di Pawlet', 'Catat transaksi harian dan pantau modal, penjualan, serta keuntungan secara otomatis.'],
+    ['info', 'Stok perlu diperiksa', 'Beberapa produk memiliki stok menipis. Periksa halaman Produk secara berkala.'],
+  ];
+
+  for (const [type, title, message] of notifications) {
+    await db.execute(
+      `INSERT INTO notifications (user_id, type, title, message)
+       SELECT 1, ?, ?, ?
+       WHERE NOT EXISTS (
+         SELECT 1 FROM notifications WHERE user_id = 1 AND title = ?
+       )`,
+      [type, title, message, title]
+    );
+  }
+
+  console.log('Seed notifikasi selesai.');
   await db.end();
 };
 

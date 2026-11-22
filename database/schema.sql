@@ -103,6 +103,9 @@ CREATE TABLE IF NOT EXISTS settings (
     store_name VARCHAR(150) NOT NULL DEFAULT 'Marindal Petshop',
     store_address TEXT NULL,
     store_phone VARCHAR(30) NULL,
+    whatsapp VARCHAR(30) NULL,
+    footer_struk TEXT NULL,
+    jam_operasional VARCHAR(100) NULL,
     store_email VARCHAR(150) NULL,
     logo_url VARCHAR(2048) NULL,
 
