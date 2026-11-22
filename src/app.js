@@ -11,6 +11,7 @@ const aiRoutes = require("./routes/ai");
 const settingsRoutes = require("./routes/settings");
 const notificationRoutes = require("./routes/notification");
 const userAliasRoutes = require("./routes/userAlias");
+const { notFound, errorHandler } = require("./middleware/errorHandler");
 
 const app = express();
 
@@ -22,7 +23,7 @@ app.use( cors({
 );
 
 // Middleware JSON
-app.use(express.json());
+app.use(express.json({ limit: "1mb" }));
 
 // Middleware URL encoded
 app.use(express.urlencoded({ extended: true }));
@@ -50,13 +51,9 @@ app.use("/api/v1/settings", settingsRoutes);
 app.use("/api/v1/notifications", notificationRoutes);
 app.use("/api/v1/users", userAliasRoutes);
 
-// Route tidak ditemukan
-app.use((req, res) => {
-  return res.status(404).json({
-    success: false,
-    message: "Endpoint tidak ditemukan.",
-  });
-});
+// Route tidak ditemukan + error handler global (harus paling akhir)
+app.use(notFound);
+app.use(errorHandler);
 
 module.exports = app;
 

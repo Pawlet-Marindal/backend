@@ -32,5 +32,15 @@ async function startServer() {
   }
 }
 
+// Jangan biarkan error tak tertangkap membuat proses mati tanpa jejak.
+process.on("unhandledRejection", (reason) => {
+  console.error("[unhandledRejection]", reason);
+});
+
+process.on("uncaughtException", (error) => {
+  console.error("[uncaughtException]", error);
+  process.exit(1);
+});
+
 startServer();
 
