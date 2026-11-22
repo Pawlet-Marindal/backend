@@ -4,6 +4,7 @@ require("dotenv").config();
 
 const authRoutes = require("./routes/auth");
 const productRoutes = require("./routes/product");
+const transactionRoutes = require("./routes/transaction");
 
 const app = express();
 
@@ -35,6 +36,7 @@ app.get("/api/v1/health", (req, res) => {
 // Routes API v1
 app.use("/api/v1/auth", authRoutes);
 app.use("/api/v1/products", productRoutes);
+app.use("/api/v1/transactions", transactionRoutes);
 
 // Route tidak ditemukan
 app.use((req, res) => {
