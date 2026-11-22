@@ -1,13 +1,13 @@
-
 const express = require("express");
 const cors = require("cors");
 require("dotenv").config();
 
+const authRoutes = require("./routes/auth");
+
 const app = express();
 
 // Middleware CORS
-app.use(
-  cors({
+app.use( cors({
     origin: process.env.CLIENT_URL || "http://localhost:5173",
     credentials: true,
   })
@@ -23,13 +23,16 @@ app.use(express.urlencoded({ extended: true }));
 app.get("/api/v1/health", (req, res) => {
   return res.status(200).json({
     success: true,
-    message: "Pawlet API berjalan dengan baik.",
+    message: "Pawlet API berjalan baik.",
     data: {
       status: "OK",
       environment: process.env.NODE_ENV,
     },
   });
 });
+
+// Routes API v1
+app.use("/api/v1/auth", authRoutes);
 
 // Route tidak ditemukan
 app.use((req, res) => {
