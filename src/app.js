@@ -3,6 +3,7 @@ const cors = require("cors");
 require("dotenv").config();
 
 const authRoutes = require("./routes/auth");
+const productRoutes = require("./routes/product");
 
 const app = express();
 
@@ -33,6 +34,7 @@ app.get("/api/v1/health", (req, res) => {
 
 // Routes API v1
 app.use("/api/v1/auth", authRoutes);
+app.use("/api/v1/products", productRoutes);
 
 // Route tidak ditemukan
 app.use((req, res) => {
