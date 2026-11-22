@@ -2,10 +2,6 @@
 
 Back-End REST API untuk aplikasi Pawlet (Marindal Petshop POS). Dibangun dengan **Express + MySQL + JWT + Joi**.
 
-Front-End: `pawlet-fe-prototype` (React + Vite). Kontrak API: `API_CONTRACT.md` di repo front-end.
-
-> **Catatan keamanan:** README ini sengaja tidak memuat kredensial, token, password, maupun nilai variabel rahasia. Semua nilai sensitif hanya ada di file `.env` lokal (tidak di-commit) dan dikelola oleh tim.
-
 ---
 
 ## 1. Teknologi yang Dipakai
@@ -56,7 +52,7 @@ pawlet-be/
 ### Prasyarat
 - Node.js dan npm sudah terpasang
 - MySQL/MariaDB sudah berjalan
-- Akses database diberikan oleh tim (jangan minta password lewat chat publik)
+- Akses database 
 
 ### Langkah
 
@@ -71,33 +67,16 @@ cp .env.example .env
 ```
 Lalu isi nilai variabel sesuai lingkunganmu. **Jangan pernah commit `.env`** — sudah masuk `.gitignore`.
 
-Nama variabel yang dipakai:
-
-| Variabel | Fungsi |
-|----------|--------|
-| `PORT` | Port server |
-| `NODE_ENV` | Mode lingkungan |
-| `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME` | Koneksi database |
-| `DB_SSL`, `DB_SSL_CA` | *(opsional)* TLS untuk database hosted; isi `DB_SSL_CA` bila provider memberi CA |
-| `JWT_SECRET` | Kunci penandatanganan token (rahasia) |
-| `JWT_EXPIRES_IN` | Masa berlaku token |
-| `CLIENT_URL` | Asal request front-end yang diizinkan CORS |
-| `AI_SERVICE_URL` | *(opsional)* alamat layanan AI; kosongkan untuk pakai jawaban lokal |
-
 **3. Siapkan database**
 ```bash
 mysql -u <user> -p < database/schema.sql
-mysql -u <user> -p <nama_db> < database/migrations/001_settings_columns.sql
 ```
-> Untuk database yang dibuat dari `schema.sql` versi terbaru, migrasi di atas biasanya tidak diperlukan.
 
 **4. Isi data awal (development)**
 ```bash
 npm run seed
 ```
-Seeder membuat akun, produk, dan notifikasi contoh. Kredensialnya dikelola tim — **jangan ditulis di README atau dokumen publik**.
-
-> **Production:** jangan jalankan seeder. Akun contoh memiliki password bawaan yang diketahui tim.
+Seeder membuat akun, produk, dan notifikasi contoh.
 
 **5. Jalankan server**
 ```bash
