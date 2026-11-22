@@ -1,15 +1,14 @@
 const { fail } = require('../utils/response');
 
-/** Rute tidak ditemukan — tetap balas JSON envelope. */
+// Rute tidak ditemukan — tetap balas JSON envelope. 
 const notFound = (req, res) => {
   return fail(res, 404, 'Endpoint tidak ditemukan.');
 };
 
-/**
- * Error handler global (harus didaftarkan paling akhir).
- * Semua error — termasuk JSON rusak dari express.json() — dijawab JSON,
- * bukan halaman HTML bawaan Express.
- */
+// Error handler global (harus didaftarkan paling akhir).
+// Semua error — termasuk JSON rusak dari express.json() — dijawab JSON,
+// bukan halaman HTML bawaan Express.
+ 
 const errorHandler = (err, req, res, next) => {
   if (res.headersSent) {
     return next(err);

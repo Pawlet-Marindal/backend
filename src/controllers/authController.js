@@ -73,10 +73,9 @@ const me = async (req, res) => {
   }
 };
 
-/**
- * JWT bersifat stateless, jadi logout cukup mengembalikan pesan sukses.
- * Frontend bertugas menghapus token dari localStorage/sessionStorage.
- */
+// JWT bersifat stateless, jadi logout cukup mengembalikan pesan sukses.
+// Frontend bertugas menghapus token dari localStorage/sessionStorage.
+
 const logout = async (req, res) => {
   return success(res, { message: 'Berhasil keluar.' }, 200);
 };

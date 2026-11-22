@@ -3,14 +3,14 @@ const app = require("../../src/app");
 
 const FUNCTION_PREFIX = "/.netlify/functions/api";
 
-/**
- * Netlify bisa mengirim path dalam beberapa bentuk:
- * - /.netlify/functions/api/auth/login   (redirect /api/v1/*)
- * - /api/v1/auth/login                   (path asli masih terbawa)
- * - /.netlify/functions/api/v1/health    (splat sudah berisi v1)
- *
- * Semua dinormalkan ke /api/v1/... supaya route Express tetap cocok.
- */
+
+ // Netlify bisa mengirim path dalam beberapa bentuk:
+ // - /.netlify/functions/api/auth/login   (redirect /api/v1/*)
+ // - /api/v1/auth/login                   (path asli masih terbawa)
+ // - /.netlify/functions/api/v1/health    (splat sudah berisi v1)
+ // 
+ // Semua dinormalkan ke /api/v1/... supaya route Express tetap cocok.
+ 
 function normalizePath(rawUrl) {
   const value = String(rawUrl || "/");
   const queryIndex = value.indexOf("?");

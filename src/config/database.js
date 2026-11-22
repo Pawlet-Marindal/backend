@@ -16,7 +16,7 @@ const config = {
   keepAliveInitialDelay: 0,
 };
 
-// DB hosted biasanya mewajibkan TLS. Isi DB_SSL_CA bila provider memberi CA.
+// SSL => true | false 
 if (String(process.env.DB_SSL || "").toLowerCase() === "true") {
   config.ssl = process.env.DB_SSL_CA
     ? { ca: process.env.DB_SSL_CA.replace(/\\n/g, "\n") }

@@ -72,7 +72,7 @@ const localReply = async (message) => {
 };
 
 // Jika AI_SERVICE_URL diisi, kirim ke layanan AI sungguhan (timeout 10 detik).
-// Gagal/timeout → null, dan controller akan membalas 503 sesuai kontrak.
+// Gagal | timeout → null, dan controller akan membalas 503 sesuai kontrak.
  
 const requestAiService = async (message) => {
   if (!process.env.AI_SERVICE_URL) return null;
