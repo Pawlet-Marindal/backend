@@ -6,6 +6,8 @@ const authRoutes = require("./routes/auth");
 const productRoutes = require("./routes/product");
 const transactionRoutes = require("./routes/transaction");
 const dashboardRoutes = require("./routes/dashboard");
+const analyticsRoutes = require("./routes/analytics");
+const aiRoutes = require("./routes/ai");
 
 const app = express();
 
@@ -39,6 +41,8 @@ app.use("/api/v1/auth", authRoutes);
 app.use("/api/v1/products", productRoutes);
 app.use("/api/v1/transactions", transactionRoutes);
 app.use("/api/v1/dashboard", dashboardRoutes);
+app.use("/api/v1/analytics", analyticsRoutes);
+app.use("/api/v1/ai", aiRoutes);
 
 // Route tidak ditemukan
 app.use((req, res) => {

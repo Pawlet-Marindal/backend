@@ -1,42 +1,8 @@
 const db = require('../config/database');
 const { success, fail } = require('../utils/response');
+const { resolveMonth, percentChange } = require('../utils/period');
 
-/** Ubah "YYYY-MM" jadi rentang waktu SQL + jumlah hari dalam bulan. */
-const resolveMonth = (rawMonth) => {
-  const fallback = new Date().toISOString().slice(0, 7);
-  const month = /^\d{4}-\d{2}$/.test(String(rawMonth || '')) ? String(rawMonth) : fallback;
-  const [year, monthNumber] = month.split('-').map(Number);
-
-  const start = new Date(Date.UTC(year, monthNumber - 1, 1));
-  const end = new Date(Date.UTC(year, monthNumber, 1));
-  const daysInMonth = new Date(Date.UTC(year, monthNumber, 0)).getUTCDate();
-
-  return {
-    month,
-    start: start.toISOString().slice(0, 19).replace('T', ' '),
-    end: end.toISOString().slice(0, 19).replace('T', ' '),
-    daysInMonth,
-    shift: (offset) => {
-      const shifted = new Date(Date.UTC(year, monthNumber - 1 + offset, 1));
-      return {
-        start: shifted.toISOString().slice(0, 19).replace('T', ' '),
-        end: new Date(Date.UTC(shifted.getUTCFullYear(), shifted.getUTCMonth() + 1, 1))
-          .toISOString()
-          .slice(0, 19)
-          .replace('T', ' '),
-      };
-    },
-  };
-};
-
-const percentChange = (current, previous) => {
-  const c = Number(current) || 0;
-  const p = Number(previous) || 0;
-  if (p === 0) return c === 0 ? 0 : 100;
-  return ((c - p) / Math.abs(p)) * 100;
-};
-
-/** Ambil agregat modal/penjualan/keuntungan/transaksi pada rentang tertentu. */
+// Ambil agregat modal/penjualan/keuntungan/transaksi pada rentang tertentu. 
 const aggregate = async (range) => {
   const [rows] = await db.execute(
     `SELECT COALESCE(SUM(total_cost), 0) AS modal,
@@ -56,7 +22,7 @@ const aggregate = async (range) => {
   };
 };
 
-/** KPI ringkasan bulan ini + perubahan dibanding bulan sebelumnya. */
+// KPI ringkasan bulan ini + perubahan dibanding bulan sebelumnya. 
 const summary = async (req, res) => {
   try {
     const currentMonth = resolveMonth(req.query.month);
@@ -83,7 +49,7 @@ const summary = async (req, res) => {
   }
 };
 
-/** Tren harian. Tanggal tanpa transaksi = null (bukan 0). */
+// Tren harian. Tanggal tanpa transaksi = null (bukan 0). 
 const trend = async (req, res) => {
   try {
     const currentMonth = resolveMonth(req.query.month);
@@ -121,7 +87,7 @@ const trend = async (req, res) => {
   }
 };
 
-/** Rekap bulanan: ringkasan, per hari, dan produk terlaris. */
+// Rekap bulanan: ringkasan, per hari, dan produk terlaris. 
 const report = async (req, res) => {
   try {
     const currentMonth = resolveMonth(req.query.month);
